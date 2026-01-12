@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clima España (Sevilla, Cádiz, Badajoz)</title>
+    
+    <!-- 1. Tailwind CSS para los estilos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. React y ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 3. Babel para entender el código JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Estilos Globales -->
+    <style>
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        @keyframes slow-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-slow-spin {
+          animation: slow-spin 20s linear infinite;
+        }
+        /* Animación suave para el cambio de ciudad */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Contenedor principal de React -->
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- DEFINICIÓN MANUAL DE ICONOS (PARA EVITAR ERRORES DE CDN) ---
+        // Estos componentes SVG reemplazan a la librería externa para asegurar que funcione siempre.
+        
+        const IconBase = ({ children, className, ...props }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="24" 
+                height="24" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className} 
+                {...props}
+            >
+                {children}
+            </svg>
+        );
+
+        const Sun = (props) => (
+            <IconBase {...props}>
+                <circle cx="12" cy="12" r="4"></circle>
+                <path d="M12 2v2"></path><path d="M12 20v2"></path>
+                <path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path>
+                <path d="M2 12h2"></path><path d="M20 12h2"></path>
+                <path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path>
+            </IconBase>
+        );
+
+        const Cloud = (props) => (
+            <IconBase {...props}>
+                <path d="M17.5 19c0-1.7-1.3-3-3-3h-1.1c-.1-2.9-2.4-5.2-5.3-5.3-2.7 0-5 2.2-5 4.9v.4C1.3 16.7 1.3 20 4.5 20H15c1.4 0 2.5-1.1 2.5-2.5Z"></path>
+            </IconBase>
+        );
+
+        const CloudRain = (props) => (
+            <IconBase {...props}>
+                <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                <path d="M16 14v6"></path><path d="M8 14v6"></path><path d="M12 16v6"></path>
+            </IconBase>
+        );
+
+        const Wind = (props) => (
+            <IconBase {...props}>
+                <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"></path>
+                <path d="M9.6 4.6A2 2 0 1 1 11 8H2"></path>
+                <path d="M12.6 19.4A2 2 0 1 0 14 16H2"></path>
+            </IconBase>
+        );
+
+        const Droplets = (props) => (
+            <IconBase {...props}>
+                <path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.8-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"></path>
+                <path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path>
+            </IconBase>
+        );
+
+        const Thermometer = (props) => (
+            <IconBase {...props}>
+                <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"></path>
+            </IconBase>
+        );
+
+        const MapPin = (props) => (
+            <IconBase {...props}>
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+            </IconBase>
+        );
+
+        const Clock = (props) => (
+            <IconBase {...props}>
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </IconBase>
+        );
+
+        const Calendar = (props) => (
+            <IconBase {...props}>
+                <rect width="18" height="18" x="3" y="4" rx="2" ry="2"></rect>
+                <line x1="16" x2="16" y1="2" y2="6"></line>
+                <line x1="8" x2="8" y1="2" y2="6"></line>
+                <line x1="3" x2="21" y1="10" y2="10"></line>
+            </IconBase>
+        );
+
+        const ArrowUp = (props) => (
+            <IconBase {...props}>
+                <path d="m5 12 7-7 7 7"></path>
+                <path d="M12 19V5"></path>
+            </IconBase>
+        );
+
+        const ArrowDown = (props) => (
+            <IconBase {...props}>
+                <path d="M12 5v14"></path>
+                <path d="m19 12-7 7-7-7"></path>
+            </IconBase>
+        );
+
+        const Navigation = (props) => (
+            <IconBase {...props}>
+                <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+            </IconBase>
+        );
+
+        const Umbrella = (props) => (
+            <IconBase {...props}>
+                <path d="M22 12a10.06 10.06 0 0 0-10-10A10.06 10.06 0 0 0 2 12"></path>
+                <path d="M12 12v8a2 2 0 0 0 4 0"></path>
+                <path d="M12 2v1"></path>
+            </IconBase>
+        );
+
+        const Eye = (props) => (
+            <IconBase {...props}>
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </IconBase>
+        );
+
+        const RefreshCw = (props) => (
+            <IconBase {...props}>
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                <path d="M21 3v5h-5"></path>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                <path d="M8 16H3v5"></path>
+            </IconBase>
+        );
+
+        const Menu = (props) => (
+            <IconBase {...props}>
+                <line x1="4" x2="20" y1="12" y2="12"></line>
+                <line x1="4" x2="20" y1="6" y2="6"></line>
+                <line x1="4" x2="20" y1="18" y2="18"></line>
+            </IconBase>
+        );
+
+        const AlertTriangle = (props) => (
+            <IconBase {...props}>
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                <line x1="12" x2="12" y1="9" y2="13"></line>
+                <line x1="12" x2="12.01" y1="17" y2="17"></line>
+            </IconBase>
+        );
+
+        // --- CONSTANTES DE CIUDADES ---
+        const CITIES = [
+            { 
+                name: 'Sevilla', 
+                region: 'Andalucía',
+                lat: 37.3886, 
+                lon: -5.9823,
+                aemetId: 'id41091',
+                theme: 'from-[#FF9A9E] via-[#FECFEF] to-[#F6F9FC]' // Rosa/Naranja
+            },
+            { 
+                name: 'Cádiz', 
+                region: 'Andalucía',
+                lat: 36.5267, 
+                lon: -6.2920,
+                aemetId: 'id11012',
+                theme: 'from-[#4FACFE] via-[#00F2FE] to-[#E0F7FA]' // Azul Mar
+            },
+            { 
+                name: 'Badajoz', 
+                region: 'Extremadura',
+                lat: 38.8778, 
+                lon: -6.9706,
+                aemetId: 'id06015',
+                theme: 'from-[#43e97b] via-[#38f9d7] to-[#e0f7fa]' // Verde/Turquesa
+            }
+        ];
+
+        // --- COMPONENTES UI Y UTILIDADES ---
+
+        const GlassCard = ({ children, className = "" }) => (
+        <div className={`backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl rounded-3xl p-6 ${className}`}>
+            {children}
+        </div>
+        );
+
+        // --- UTILIDADES DE MAPEO DE DATOS REALES (WMO Codes) ---
+        const getWeatherInfo = (code, isDay = 1) => {
+        // Códigos WMO (World Meteorological Organization)
+        const codes = {
+            0: { label: 'Despejado', icon: isDay ? 'sun' : 'moon' },
+            1: { label: 'Mayormente despejado', icon: isDay ? 'sun' : 'moon' },
+            2: { label: 'Parcialmente nublado', icon: 'cloud' },
+            3: { label: 'Nublado', icon: 'cloud' },
+            45: { label: 'Niebla', icon: 'cloud' },
+            48: { label: 'Niebla con escarcha', icon: 'cloud' },
+            51: { label: 'Llovizna ligera', icon: 'rain' },
+            53: { label: 'Llovizna moderada', icon: 'rain' },
+            55: { label: 'Llovizna densa', icon: 'rain' },
+            61: { label: 'Lluvia leve', icon: 'rain' },
+            63: { label: 'Lluvia moderada', icon: 'rain' },
+            65: { label: 'Lluvia fuerte', icon: 'rain' },
+            71: { label: 'Nieve ligera', icon: 'rain' },
+            80: { label: 'Chubascos', icon: 'rain' },
+            81: { label: 'Chubascos fuertes', icon: 'rain' },
+            95: { label: 'Tormenta', icon: 'rain' },
+        };
+        return codes[code] || { label: 'Desconocido', icon: 'sun' };
+        };
+
+        // --- FUNCIÓN PARA OBTENER DATOS REALES ---
+        const fetchRealWeatherData = async (lat, lon) => {
+        try {
+            // Usamos Open-Meteo API con coordenadas dinámicas
+            const response = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,surface_pressure,visibility&hourly=temperature_2m,weather_code,precipitation_probability,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Europe%2FMadrid`
+            );
+            
+            if (!response.ok) throw new Error("Error conectando al servicio meteorológico");
+            
+            const data = await response.json();
+            
+            // 1. Procesar Clima Actual
+            const currentInfo = getWeatherInfo(data.current.weather_code, data.current.is_day);
+            
+            // 2. Procesar Por Horas (próximas 24h)
+            // La API devuelve arrays gigantes, tomamos desde la hora actual
+            const currentHourIndex = new Date().getHours();
+            const hourlyData = [];
+            
+            for(let i = currentHourIndex; i < currentHourIndex + 24; i++) {
+            // Asegurarnos de no salir del índice si la API devuelve justo 24h o más días
+            if(data.hourly.time[i]) {
+                const date = new Date(data.hourly.time[i]);
+                const hCode = data.hourly.weather_code[i];
+                // Determinar si es noche (aprox 20:00 a 07:00 para iconos simples)
+                const hHour = date.getHours();
+                const isHDay = (hHour > 7 && hHour < 21) ? 1 : 0;
+                
+                hourlyData.push({
+                time: date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+                temp: Math.round(data.hourly.temperature_2m[i]),
+                icon: getWeatherInfo(hCode, isHDay).icon,
+                precip: data.hourly.precipitation_probability[i] || 0
+                });
+            }
+            }
+
+            // 3. Procesar Diario (7 días)
+            const dailyData = [];
+            const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            
+            for(let i = 0; i < 7; i++) {
+                const date = new Date(data.daily.time[i]);
+                // Arreglo para bug de fecha en algunos navegadores al parsear YYYY-MM-DD
+                const dayName = i === 0 ? 'Hoy' : dayNames[date.getDay()]; 
+                
+                dailyData.push({
+                name: dayName,
+                max: Math.round(data.daily.temperature_2m_max[i]),
+                min: Math.round(data.daily.temperature_2m_min[i]),
+                condition: getWeatherInfo(data.daily.weather_code[i], 1).icon,
+                precipProb: data.daily.precipitation_probability_max[i]
+                });
+            }
+
+            // Generar descripción basada en datos
+            let desc = `Actualmente ${currentInfo.label.toLowerCase()} con ${data.current.temperature_2m}°C. `;
+            if (data.current.wind_speed_10m > 20) desc += "Viento considerable. ";
+            if (data.current.relative_humidity_2m > 80) desc += "Ambiente húmedo. ";
+            else desc += "Ambiente agradable.";
+
+            return {
+            current: {
+                temp: Math.round(data.current.temperature_2m),
+                condition: currentInfo.label,
+                iconType: currentInfo.icon,
+                feelsLike: Math.round(data.current.apparent_temperature),
+                humidity: data.current.relative_humidity_2m,
+                windSpeed: Math.round(data.current.wind_speed_10m),
+                uvIndex: "Mod", 
+                visibility: data.current.visibility / 1000, // Convertir m a km
+                pressure: Math.round(data.current.surface_pressure),
+                description: desc
+            },
+            hourly: hourlyData,
+            daily: dailyData
+            };
+
+        } catch (err) {
+            console.error(err);
+            return null; // Manejo de error en UI
+        }
+        };
+
+        const WeatherIcon = ({ type, className }) => {
+            switch (type) {
+                case 'sun': return <Sun className={`text-yellow-400 ${className}`} />;
+                case 'moon': return <Sun className={`text-blue-200 ${className}`} />; 
+                case 'rain': return <CloudRain className={`text-blue-400 ${className}`} />;
+                case 'cloud': return <Cloud className={`text-gray-300 ${className}`} />;
+                default: return <Sun className={`text-yellow-400 ${className}`} />;
+            }
+        };
+
+        function App() {
+            const [cityIndex, setCityIndex] = useState(0);
+            const [loading, setLoading] = useState(true);
+            const [data, setData] = useState(null);
+            const [error, setError] = useState(false);
+            const [animate, setAnimate] = useState(false);
+
+            const activeCity = CITIES[cityIndex];
+
+            const loadData = async () => {
+                setLoading(true);
+                setError(false);
+                setAnimate(false);
+                
+                const weatherData = await fetchRealWeatherData(activeCity.lat, activeCity.lon);
+                
+                if (weatherData) {
+                    setData(weatherData);
+                    setLoading(false);
+                    setTimeout(() => setAnimate(true), 100);
+                } else {
+                    setError(true);
+                    setLoading(false);
+                }
+            };
+
+            // Recargar cuando cambia la ciudad seleccionada
+            useEffect(() => {
+                loadData();
+            }, [cityIndex]);
+
+            if (loading && !data) {
+                return (
+                <div className={`min-h-screen bg-gradient-to-br ${activeCity.theme} flex items-center justify-center`}>
+                    <div className="flex flex-col items-center gap-4">
+                    <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <p className="text-white font-medium tracking-wider animate-pulse">CONECTANDO CON SATÉLITE...</p>
+                    </div>
+                </div>
+                );
+            }
+
+            if (error) {
+                return (
+                <div className="min-h-screen bg-slate-800 flex items-center justify-center p-4">
+                    <div className="bg-white/10 backdrop-blur-lg p-8 rounded-3xl text-center max-w-md border border-white/20">
+                    <AlertTriangle size={48} className="text-red-400 mx-auto mb-4" />
+                    <h2 className="text-white text-xl font-bold mb-2">Error de Conexión</h2>
+                    <p className="text-slate-300 mb-6">No se pudieron obtener los datos de {activeCity.name}.</p>
+                    <button 
+                        onClick={loadData}
+                        className="px-6 py-2 bg-pink-500 hover:bg-pink-600 text-white rounded-full font-bold transition-colors"
+                    >
+                        Reintentar
+                    </button>
+                    </div>
+                </div>
+                );
+            }
+
+            return (
+                <div className={`min-h-screen bg-gradient-to-br ${activeCity.theme} text-slate-800 font-sans selection:bg-pink-500 selection:text-white pb-10 transition-colors duration-1000`}>
+                
+                {/* Background Decorativo Dinámico */}
+                <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+                    <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-white/20 rounded-full blur-[100px] animate-pulse"></div>
+                    <div className="absolute top-[40%] -right-[10%] w-[60%] h-[60%] bg-white/20 rounded-full blur-[100px]"></div>
+                </div>
+
+                <div className="relative z-10 max-w-4xl mx-auto px-4 pt-6">
+                    
+                    {/* Header / Nav */}
+                    <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            <div className="p-2 bg-white/40 rounded-full backdrop-blur-md shadow-sm">
+                                <Menu size={20} className="text-slate-700" />
+                            </div>
+                            <div className="flex flex-col">
+                                <h1 className="text-xs font-bold tracking-widest text-slate-500 uppercase flex items-center gap-2">
+                                    ESPAÑA <span className="text-slate-400">•</span> {activeCity.region.toUpperCase()}
+                                </h1>
+                                <div className="flex items-center gap-1 text-slate-800">
+                                    <MapPin size={18} className="text-pink-600" />
+                                    <span className="font-bold text-2xl">{activeCity.name}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SELECTOR TIPO SLIDER (DOTS) */}
+                        <div className="flex items-center gap-2 bg-white/30 backdrop-blur-md px-4 py-2 rounded-full shadow-sm">
+                            {CITIES.map((city, idx) => (
+                                <button
+                                    key={city.id || idx}
+                                    onClick={() => setCityIndex(idx)}
+                                    className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                                        idx === cityIndex 
+                                            ? "bg-slate-800 scale-125 w-6" 
+                                            : "bg-slate-400/50 hover:bg-slate-600"
+                                    }`}
+                                    aria-label={`Ver tiempo en ${city.name}`}
+                                    title={city.name}
+                                ></button>
+                            ))}
+                        </div>
+
+                        <button 
+                            onClick={loadData}
+                            className="hidden md:block p-3 bg-white/40 hover:bg-white/60 rounded-full transition-all active:scale-95 backdrop-blur-md shadow-sm"
+                        >
+                            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+                        </button>
+                    </header>
+
+                    {/* Contenido Principal con Animación de Entrada */}
+                    {data && (
+                        <div key={activeCity.name} className="fade-in">
+                            {/* Hero Section - Clima Actual */}
+                            <div className={`transition-all duration-1000 transform ${animate ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                    
+                                    {/* Tarjeta Principal */}
+                                    <GlassCard className="flex flex-col justify-between min-h-[300px] relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 p-8 opacity-20 group-hover:opacity-30 transition-opacity duration-500">
+                                            <WeatherIcon type={data.current.iconType} className="w-[180px] h-[180px] text-white animate-slow-spin" />
+                                        </div>
+                                        
+                                        <div>
+                                            <span className="inline-block px-3 py-1 bg-white/30 rounded-full text-xs font-bold text-slate-700 mb-2 border border-white/20">
+                                            AHORA
+                                            </span>
+                                            <h2 className="text-6xl md:text-8xl font-black text-slate-800 tracking-tighter">
+                                            {data.current.temp}°
+                                            </h2>
+                                            <p className="text-xl text-slate-600 font-medium flex items-center gap-2 mt-2">
+                                            {data.current.condition}
+                                            <span className="w-1 h-1 bg-slate-400 rounded-full"></span>
+                                            S.T. {data.current.feelsLike}°
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-8">
+                                            <p className="text-slate-700 leading-relaxed max-w-xs text-sm">
+                                            {data.current.description} <br/>
+                                            <a 
+                                                href={`https://www.aemet.es/es/eltiempo/prediccion/municipios/${activeCity.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}-${activeCity.aemetId}`} 
+                                                target="_blank" 
+                                                rel="noreferrer" 
+                                                className="text-pink-600 text-xs font-bold hover:underline mt-2 inline-flex items-center gap-1"
+                                            >
+                                                COMPARAR CON AEMET <Navigation size={10}/>
+                                            </a>
+                                            </p>
+                                        </div>
+                                    </GlassCard>
+
+                                    {/* Grid de Detalles Rápidos */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <GlassCard className="flex flex-col items-center justify-center gap-2 hover:bg-white/20 transition-colors">
+                                            <Wind size={28} className="text-slate-500 mb-1" />
+                                            <span className="text-slate-500 text-sm font-semibold">Viento</span>
+                                            <span className="text-2xl font-bold text-slate-800">{data.current.windSpeed} <span className="text-sm font-normal">km/h</span></span>
+                                        </GlassCard>
+                                        
+                                        <GlassCard className="flex flex-col items-center justify-center gap-2 hover:bg-white/20 transition-colors">
+                                            <Droplets size={28} className="text-blue-500 mb-1" />
+                                            <span className="text-slate-500 text-sm font-semibold">Humedad</span>
+                                            <span className="text-2xl font-bold text-slate-800">{data.current.humidity}%</span>
+                                        </GlassCard>
+
+                                        <GlassCard className="flex flex-col items-center justify-center gap-2 hover:bg-white/20 transition-colors">
+                                            <Sun size={28} className="text-orange-500 mb-1" />
+                                            <span className="text-slate-500 text-sm font-semibold">Presión</span>
+                                            <span className="text-2xl font-bold text-slate-800">{data.current.pressure} <span className="text-sm font-normal">hPa</span></span>
+                                        </GlassCard>
+
+                                        <GlassCard className="flex flex-col items-center justify-center gap-2 hover:bg-white/20 transition-colors">
+                                            <Eye size={28} className="text-purple-500 mb-1" />
+                                            <span className="text-slate-500 text-sm font-semibold">Visibilidad</span>
+                                            <span className="text-2xl font-bold text-slate-800">{data.current.visibility} <span className="text-sm font-normal">km</span></span>
+                                        </GlassCard>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Sección de Pronóstico por Horas */}
+                            <div className={`mb-8 transition-all duration-1000 delay-200 transform ${animate ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
+                                <div className="flex items-center justify-between mb-4 px-2">
+                                    <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                    <Clock size={18} className="text-pink-500"/> Por horas ({activeCity.name})
+                                    </h3>
+                                </div>
+                                
+                                <GlassCard className="!p-0 overflow-hidden">
+                                    <div className="overflow-x-auto pb-4 pt-6 px-6 hide-scrollbar flex gap-8">
+                                    {data.hourly.map((hour, idx) => (
+                                        <div key={idx} className="flex flex-col items-center gap-3 min-w-[60px] group cursor-pointer">
+                                        <span className="text-sm font-medium text-slate-500">{hour.time}</span>
+                                        <div className="p-3 rounded-2xl bg-white/30 group-hover:bg-pink-100 transition-colors group-hover:scale-110 duration-300">
+                                            <WeatherIcon type={hour.icon} size={24} />
+                                        </div>
+                                        <span className="font-bold text-lg text-slate-800">{hour.temp}°</span>
+                                        {hour.precip > 0 && (
+                                            <span className="text-xs font-bold text-blue-500 flex items-center">
+                                            <Umbrella size={10} className="mr-1"/> {hour.precip}%
+                                            </span>
+                                        )}
+                                        </div>
+                                    ))}
+                                    </div>
+                                </GlassCard>
+                            </div>
+
+                            {/* Pronóstico 7 Días */}
+                            <div className={`transition-all duration-1000 delay-300 transform ${animate ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
+                                <div className="flex items-center justify-between mb-4 px-2">
+                                    <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                    <Calendar size={18} className="text-pink-500"/> Próximos 7 días
+                                    </h3>
+                                </div>
+
+                                <GlassCard className="!p-0">
+                                    <div className="divide-y divide-white/20">
+                                    {data.daily.map((day, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-5 hover:bg-white/10 transition-colors cursor-pointer group">
+                                        <div className="w-24 font-bold text-slate-700">{day.name}</div>
+                                        
+                                        <div className="flex items-center gap-3 flex-1 justify-center">
+                                            <WeatherIcon type={day.condition} className="w-6 h-6" />
+                                            <span className="text-sm text-slate-500 hidden sm:block">
+                                            {day.precipProb > 30 ? `Lluvia ${day.precipProb}%` : ''}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-6 w-32 justify-end">
+                                            <div className="flex flex-col items-end">
+                                            <span className="text-xs text-slate-400 font-bold uppercase">Max</span>
+                                            <span className="font-bold text-lg text-slate-800">{day.max}°</span>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                            <span className="text-xs text-slate-400 font-bold uppercase">Min</span>
+                                            <span className="font-bold text-lg text-slate-500">{day.min}°</span>
+                                            </div>
+                                        </div>
+                                        </div>
+                                    ))}
+                                    </div>
+                                </GlassCard>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    <footer className="mt-12 mb-6 text-center">
+                    <p className="text-slate-500 text-sm">
+                        Diseñado para monitorizar {activeCity.name} - {activeCity.aemetId}
+                    </p>
+                    <p className="text-slate-400 text-xs mt-1">
+                        Datos en tiempo real provistos por Open-Meteo API. <br/>
+                        Para predicciones oficiales y alertas, consulte siempre <a href="https://www.aemet.es/" target="_blank" className="underline hover:text-pink-600 font-bold">AEMET</a>.
+                    </p>
+                    </footer>
+
+                </div>
+                </div>
+            );
+        }
+
+        // --- RENDERIZADO EN EL DOM ---
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
